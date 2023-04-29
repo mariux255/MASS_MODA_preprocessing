@@ -140,14 +140,17 @@ def overlapping_windows(sequence, labels, master_start, master_stop, sampling_fr
     window_len = sampling_frequency * window_duration
     step_size = (1-overlap) * window_len
     no_windows = int(sequence.shape[0]/step_size)
-
+    #print(window_len)
+    #print(step_size)
+    #print(no_windows)
     sequence_windowed = []
     labels_windowed = []
     for i in range(0,no_windows):
         window_start = int((i)*step_size)
-        if window_start > (master_stop*sampling_frequency - window_len):
+        if window_start > ((master_stop-master_start)*sampling_frequency - window_len):
             continue
         sequence_windowed.append(sequence[window_start:(window_start+window_len)])
+
         current_window = []
         for j in range(0,len(labels)):
             # NEEDS TO BE CHANGED. If spindle more than 0.5s then keep
@@ -156,7 +159,7 @@ def overlapping_windows(sequence, labels, master_start, master_stop, sampling_fr
                 y1 = 0
                 x2 = (labels[j][0]-(window_start/sampling_frequency) - master_start + labels[j][1])/window_duration
                 y2 = 1
-                current_window.append((x1, y1, x2, y2))
+                current_window.append((x1, x2))
         labels_windowed.append(current_window)
     return sequence_windowed, labels_windowed
 
@@ -191,35 +194,27 @@ def get_segment_viewed(mass_recordings_dict, moda_annotation_path, processed_pat
         for j,window in enumerate(sequence_windowed):
             if labels_windowed[j] == []:
                 continue
-            fig, Sxx = plot_spectrogram(window, MASS_sampling_freq, win_sec = 2, fmin = 0.3, fmax = 20,train=True, arrays=True)
+            #fig, Sxx = plot_spectrogram(window, MASS_sampling_freq, win_sec = 2, fmin = 0.3, fmax = 20,train=True, arrays=True)
 
-            if not exists(processed_path + '/MASS_MODA_processed'):
-                mkdir(processed_path + '/MASS_MODA_processed')
+            if not exists(processed_path + '/1D_MASS_MODA_processed'):
+                mkdir(processed_path + '/1D_MASS_MODA_processed')
 
-            if not exists(processed_path + '/MASS_MODA_processed' + '/images'):
-                mkdir(processed_path + '/MASS_MODA_processed' + '/images')
+            if not exists(processed_path + '/1D_MASS_MODA_processed' + '/input/'):
+                mkdir(processed_path + '/1D_MASS_MODA_processed' + '/input/')
 
-            if not exists(processed_path + '/MASS_MODA_processed' + '/images/' + file_name):
-                mkdir(processed_path + '/MASS_MODA_processed' + '/images/' + file_name)
+            if not exists(processed_path + '/1D_MASS_MODA_processed' + '/input/' + file_name):
+                mkdir(processed_path + '/1D_MASS_MODA_processed' + '/input/' + file_name)
 
-            if not exists(processed_path + '/MASS_MODA_processed' + '/real/'):
-                mkdir(processed_path + '/MASS_MODA_processed' + '/real/')
+            if not exists(processed_path + '/1D_MASS_MODA_processed' + '/labels/'):
+                mkdir(processed_path + '/1D_MASS_MODA_processed' + '/labels/')
 
-            if not exists(processed_path + '/MASS_MODA_processed' + '/real/' + file_name):
-                mkdir(processed_path + '/MASS_MODA_processed' + '/real/' + file_name)
-
-            if not exists(processed_path + '/MASS_MODA_processed' + '/labels/'):
-                mkdir(processed_path + '/MASS_MODA_processed' + '/labels/')
-
-            if not exists(processed_path + '/MASS_MODA_processed' + '/labels/' + file_name):
-                mkdir(processed_path + '/MASS_MODA_processed' + '/labels/' + file_name)
+            if not exists(processed_path + '/1D_MASS_MODA_processed' + '/labels/' + file_name):
+                mkdir(processed_path + '/1D_MASS_MODA_processed' + '/labels/' + file_name)
 
 
-            fig.savefig(processed_path + '/MASS_MODA_processed' + '/images/' + file_name + "/" + str(counter) + '.png', bbox_inches='tight')
-            #print(processed_path + '/MASS_MODA_processed' + '/real/' + file_name + "/" + str(counter))
-            np.save(processed_path + '/MASS_MODA_processed' + '/real/' + file_name + "/" + str(counter) + '.npy', Sxx)
+            np.save(processed_path + '/1D_MASS_MODA_processed' + '/input/' + file_name + "/" + str(counter) + '.npy', np.asarray(window))
             #np.save(Dreams_path + '/windowed' + '/labels/' + str(i) + "/" + str(j) + '.npy', label_windows)
-            with open(processed_path + '/MASS_MODA_processed' + '/labels/' + file_name + "/" + str(counter) + '.json', 'w') as fp:
+            with open(processed_path + '/1D_MASS_MODA_processed' + '/labels/' + file_name + "/" + str(counter) + '.json', 'w') as fp:
                 json.dump({'boxes':labels_windowed[j], 'labels':[0]*len(labels_windowed[j])}, fp)
 
             counter += 1
