@@ -3,9 +3,9 @@ WINDOW_SIZE = 23
 MASS_sampling_freq = 256
 
 
-MASS_path = '/home/marius/Documents/THESIS/data/mass'
-MODA_path = '/home/marius/Documents/THESIS/data/MODA_GC/output/exp/annotFiles'
-MASS_MODA_proccessed_path = '/home/marius/Documents/THESIS/data/temp'
+MASS_path = '/dtu-compute/macaroni/data/mass'
+MODA_path = '/home/s174411/code/MODA_GC/output/exp/annotFiles'
+MASS_MODA_proccessed_path = '/scratch/s174411/center_width'
 
 from scipy import signal
 from scipy.fft import fftshift
@@ -143,7 +143,7 @@ def overlapping_windows(sequence, labels, master_start, master_stop, sampling_fr
     if ((master_stop-master_start)*sampling_frequency) % step_size == 0:
         no_windows = int((master_stop-master_start)*sampling_frequency/step_size)
     else:
-        no_windows = (master_stop-master_start) * sampling_frequency // step_size
+        no_windows = int((master_stop-master_start) * sampling_frequency // step_size)
         no_windows += 1
 
     sequence_windowed = []
@@ -170,7 +170,7 @@ def overlapping_windows(sequence, labels, master_start, master_stop, sampling_fr
                     x1 = 0
                     x2 = (labels[j][0] + labels[j][1] - (master_start + (window_start/sampling_frequency)))/window_duration
                     width = x2 - x1
-                    center = width/2
+                    center = x1 + width/2
                     current_window.append((center, width))
                     continue
                 # if spindle ends after windows end, use windows end as ending coordinate
@@ -178,14 +178,14 @@ def overlapping_windows(sequence, labels, master_start, master_stop, sampling_fr
                     x1 = (labels[j][0] - (master_start + (window_start/sampling_frequency)))/window_duration
                     x2 = 1
                     width = x2 - x1
-                    center = width/2
+                    center = x1 + width/2
                     current_window.append((center, width))
                     continue
                 
                 x1 = (labels[j][0] - (master_start + (window_start/sampling_frequency)))/window_duration
                 x2 = (labels[j][0] + labels[j][1] - (master_start + (window_start/sampling_frequency)))/window_duration
                 width = x2 - x1
-                center = width/2
+                center = x1 + width/2
                 current_window.append((center, width))
         #print(current_window)
         labels_windowed.append(current_window)
@@ -261,9 +261,5 @@ for root, dirs, files in walk(MODA_path, topdown=False):
     for name in files:
         if name[-6:] == 'GS.txt':
             print(name)
-            try:
-                get_segment_viewed(PSG_recordings, join(root,name), MASS_MODA_proccessed_path)
-            except:
-                ...
-                #print(name, ' did not load')
+            get_segment_viewed(PSG_recordings, join(root,name), MASS_MODA_proccessed_path)
    

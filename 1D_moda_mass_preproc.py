@@ -1,12 +1,12 @@
 
 OVERLAP = 0.5
-WINDOW_SIZE = 23
+WINDOW_SIZE = 30
 MASS_sampling_freq = 256
 
 
-MASS_path = '/home/marius/Documents/THESIS/data/mass'
-MODA_path = '/home/marius/Documents/THESIS/data/MODA_GC/output/exp/annotFiles'
-MASS_MODA_proccessed_path = '/home/marius/Documents/THESIS/data/temp'
+MASS_path = '/dtu-compute/macaroni/data/mass'
+MODA_path = '/home/s174411/code/MODA_GC/output/exp/annotFiles'
+MASS_MODA_proccessed_path = '/scratch/s174411/MM_C1'
 
 from scipy import signal
 from scipy.fft import fftshift
@@ -144,7 +144,7 @@ def overlapping_windows(sequence, labels, master_start, master_stop, sampling_fr
     if ((master_stop-master_start)*sampling_frequency) % step_size == 0:
         no_windows = int((master_stop-master_start)*sampling_frequency/step_size)
     else:
-        no_windows = (master_stop-master_start) * sampling_frequency // step_size
+        no_windows = int((master_stop-master_start) * sampling_frequency // step_size)
         no_windows += 1
 
     sequence_windowed = []
@@ -237,7 +237,7 @@ def get_segment_viewed(mass_recordings_dict, moda_annotation_path, processed_pat
             #np.save(Dreams_path + '/windowed' + '/labels/' + str(i) + "/" + str(j) + '.npy', label_windows)
 
             with open(processed_path + '/1D_MASS_MODA_processed' + '/labels/' + file_name + "/" + str(counter) + '.json', 'w') as fp:
-                json.dump({'boxes':labels_windowed[j], 'labels':[0]*len(labels_windowed[j])}, fp)
+                json.dump({'boxes':labels_windowed[j], 'labels':[1]*len(labels_windowed[j])}, fp)
 
             counter += 1
 
