@@ -1,11 +1,13 @@
+
 OVERLAP = 0.5
-WINDOW_SIZE = 23
+WINDOW_SIZE = 30
 MASS_sampling_freq = 256
 
 
 MASS_path = '/dtu-compute/macaroni/data/mass'
 MODA_path = '/home/s174411/code/MODA_GC/output/exp/annotFiles'
-MASS_MODA_proccessed_path = '/scratch/s174411/center_width'
+MASS_MODA_proccessed_path = '/scratch/s174411/FIL_CEN'
+
 
 from scipy import signal
 from scipy.fft import fftshift
@@ -238,11 +240,13 @@ def get_segment_viewed(mass_recordings_dict, moda_annotation_path, processed_pat
             if not exists(processed_path + '/1D_MASS_MODA_processed' + '/labels/' + file_name):
                 mkdir(processed_path + '/1D_MASS_MODA_processed' + '/labels/' + file_name)
 
-            np.save(processed_path + '/1D_MASS_MODA_processed' + '/input/' + file_name + "/" + str(counter) + '.npy', np.asarray(window))
+            window_np = np.asarray(window)
+            filtered_array = butter_bandpass_filter(window_np, 0.3, 30, 256, 10)
+            np.save(processed_path + '/1D_MASS_MODA_processed' + '/input/' + file_name + "/" + str(counter) + '.npy', filtered_array)
             #np.save(Dreams_path + '/windowed' + '/labels/' + str(i) + "/" + str(j) + '.npy', label_windows)
 
             with open(processed_path + '/1D_MASS_MODA_processed' + '/labels/' + file_name + "/" + str(counter) + '.json', 'w') as fp:
-                json.dump({'boxes':labels_windowed[j], 'labels':[0]*len(labels_windowed[j])}, fp)
+                json.dump({'boxes':labels_windowed[j], 'labels':[1]*len(labels_windowed[j])}, fp)
 
             counter += 1
 

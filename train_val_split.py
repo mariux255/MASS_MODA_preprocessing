@@ -2,7 +2,7 @@ import os
 import random
 import shutil
 
-root_path = '/scratch/s174411/MM_C1'
+root_path = '/scratch/s174411/FIL_CEN'
 
 def remove_duplicates(l):
     seen = {}
