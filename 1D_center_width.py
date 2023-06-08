@@ -1,12 +1,12 @@
 
-OVERLAP = 0.5
+OVERLAP = 0
 WINDOW_SIZE = 30
 MASS_sampling_freq = 256
 
 
 MASS_path = '/dtu-compute/macaroni/data/mass'
 MODA_path = '/home/s174411/code/MODA_GC/output/exp/annotFiles'
-MASS_MODA_proccessed_path = '/scratch/s174411/FIL_CEN'
+MASS_MODA_proccessed_path = '/scratch/s174411/30_no_over'
 
 
 from scipy import signal
@@ -32,98 +32,6 @@ from lspopt import spectrogram_lspopt
 from matplotlib.colors import Normalize, ListedColormap
 import json
 import mne
-
-
-def plot_spectrogram(
-    data,
-    sf,
-    win_sec=30,
-    fmin=0.5,
-    fmax=25,
-    trimperc=2.5,
-    cmap="RdBu_r",
-    vmin=None,
-    vmax=None,
-    train=False,
-    arrays = False,
-    **kwargs,
-):
-   
-    # Increase font size while preserving original
-    old_fontsize = plt.rcParams["font.size"]
-    plt.rcParams.update({"font.size": 18})
-
-    # Safety checks
-    assert isinstance(data, np.ndarray), "Data must be a 1D NumPy array."
-    assert isinstance(sf, (int, float)), "sf must be int or float."
-    assert data.ndim == 1, "Data must be a 1D (single-channel) NumPy array."
-    assert isinstance(win_sec, (int, float)), "win_sec must be int or float."
-    assert isinstance(fmin, (int, float)), "fmin must be int or float."
-    assert isinstance(fmax, (int, float)), "fmax must be int or float."
-    assert fmin < fmax, "fmin must be strictly inferior to fmax."
-    assert fmax < sf / 2, "fmax must be less than Nyquist (sf / 2)."
-    assert isinstance(vmin, (int, float, type(None))), "vmin must be int, float, or None."
-    assert isinstance(vmax, (int, float, type(None))), "vmax must be int, float, or None."
-    if vmin is not None:
-        assert isinstance(vmax, (int, float)), "vmax must be int or float if vmin is provided"
-    if vmax is not None:
-        assert isinstance(vmin, (int, float)), "vmin must be int or float if vmax is provided"
-
-
-    # Calculate multi-taper spectrogram
-    nperseg = int(win_sec * sf)
-    assert data.size > 2 * nperseg, "Data length must be at least 2 * win_sec."
-    
-    
-    noverlap = int(0.9 * nperseg)
-    
-    f, t, Sxx = spectrogram_lspopt(data, sf, nperseg=nperseg, noverlap=noverlap)
-    Sxx = 10 * np.log10(Sxx)  # Convert uV^2 / Hz --> dB / Hz
-
-    # Select only relevant frequencies (up to 30 Hz)
-    good_freqs = np.logical_and(f >= fmin, f <= fmax)
-    # if raw is fed, use the Sxx below
-    Sxx = Sxx[good_freqs, :]
-    f = f[good_freqs]
-    #t /= 3600  # Convert t to hours
-
-    # Normalization
-    if vmin is None:
-        vmin, vmax = np.percentile(Sxx, [0 + trimperc, 100 - trimperc])
-    norm = Normalize(vmin=vmin, vmax=vmax)
-
-
-    fig, ax1 = plt.subplots(nrows=1, figsize=(16, 8))
-
-
-    # Draw Spectrogram
-    im = ax1.pcolormesh(t, f, Sxx, norm=norm, cmap=cmap, antialiased=True, shading="auto")
-    #ax1.set_xlim(0, t.max())
-    ax1.set_ylabel("Frequency [Hz]")
-    ax1.set_xlabel("Time [seconds]")
-
-
-    # Add colorbar
-    cbar = fig.colorbar(im, ax=ax1, shrink=0.95, fraction=0.1, aspect=25)
-    cbar.ax.set_ylabel("Log Power (dB / Hz)", rotation=270, labelpad=20)
-
-    # Revert font-size
-    plt.rcParams.update({"font.size": old_fontsize})
-
-    if(train and arrays):
-        ax1.set_axis_off()
-        cbar.remove()
-
-        return fig,Sxx
-    elif(arrays):
-        return Sxx
-    else:
-        ...
-        #ax1.set_xticks([0,1/12, 2/12, 3/12, 4/12, 5/12, 6/12], labels = np.arange(0, 35, 5))
-        
-
-
-    return fig
 
 def butter_bandpass(lowcut, highcut, fs, order=5):
         nyq = 0.5 * fs
@@ -241,7 +149,8 @@ def get_segment_viewed(mass_recordings_dict, moda_annotation_path, processed_pat
                 mkdir(processed_path + '/1D_MASS_MODA_processed' + '/labels/' + file_name)
 
             window_np = np.asarray(window)
-            filtered_array = butter_bandpass_filter(window_np, 0.3, 30, 256, 10)
+            #filtered_array = butter_bandpass_filter(window_np, 0.3, 30, 256, 10)
+            filtered_array = window_np
             np.save(processed_path + '/1D_MASS_MODA_processed' + '/input/' + file_name + "/" + str(counter) + '.npy', filtered_array)
             #np.save(Dreams_path + '/windowed' + '/labels/' + str(i) + "/" + str(j) + '.npy', label_windows)
 
