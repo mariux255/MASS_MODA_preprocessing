@@ -8,44 +8,48 @@ rng = np.random.default_rng()
 from mne.time_frequency import tfr_array_multitaper
 
 from os import listdir, mkdir, walk
-from os.path import isfile, join, exists
+from os.path import isfile, join, exists, isdir
 
 import numpy as np
 import matplotlib.pyplot as plt
 import json
 import random
 import mne
+import pandas as pd
 
 OVERLAP = 0
 WINDOW_SIZE = 30
 MASS_sampling_freq = 256
-val_proportion = 0.1
-test_proportion = 0.1
+val_proportion = 0.2
+test_proportion = 0
 
 def main():
-	MASS_path = '/home/marius/Documents/THESIS/data/mass'
-	MODA_path = '/home/marius/Documents/THESIS/data/MODA_GC/output/exp/annotFiles'
-	MASS_MODA_proccessed_path = '/home/marius/Documents/THESIS/data'
+    MASS_path = '/dtu-compute/macaroni/data/mass'
+    MODA_path = '/home/s174411/code/MODA_GC/output/exp/annotFiles'
+    MASS_MODA_proccessed_path = '/scratch/s174411/sumo_split_fix_30'
 
-	PSG_recordings = {}
-	for root, dirs, files in walk(MASS_path, topdown=False):
+    if not exists(MASS_MODA_proccessed_path):
+                mkdir(MASS_MODA_proccessed_path)
+
+    PSG_recordings = {}
+    for root, dirs, files in walk(MASS_path, topdown=False):
 	    for name in files:
 	        if name[-7:] == 'PSG.edf':
 	            PSG_recordings[name[-18:-8]] = (join(root,name))
 
 
 
-	MODA_path_dict = {}
-	for root, dirs, files in walk(MODA_path, topdown=False):
+    MODA_path_dict = {}
+    for root, dirs, files in walk(MODA_path, topdown=False):
 	    for name in files:
 	        if name[-6:] == 'GS.txt':
 	            MODA_path_dict[name[-22:-12]] = join(root, name)
 
-	segment_10 = {}
-	segment_others = {}
-	ss_no_10_total = {'1':0, '2':0, '3':0, '4':0, '5':0}
-	ss_total = {'1':0, '2':0, '3':0, '4':0, '5':0}
-	for k,v in MODA_path_dict.items():
+    segment_10 = {}
+    segment_others = {}
+    ss_no_10_total = {'1':0, '2':0, '3':0, '4':0, '5':0}
+    ss_total = {'1':0, '2':0, '3':0, '4':0, '5':0}
+    for k,v in MODA_path_dict.items():
 	    data = pd.read_csv(MODA_path_dict[k], sep="\t")
 	    data.drop(data.columns[-1], axis=1, inplace=True)
 	    relevant_segments = data[data.eventName == 'segmentViewed']
@@ -57,18 +61,18 @@ def main():
 	        segment_others[k] = v
 	        ss_no_10_total[k[4]] += 1
 
-	val_size = {}
-	test_size = {}
-	for k, v in ss_no_10_total.items():
+    val_size = {}
+    test_size = {}
+    for k, v in ss_no_10_total.items():
 	    val_size[k] = int(v*val_proportion)
 	    test_size[k] = int(v*test_proportion)
 
 
-	train_dirs_list = list(segment_others.values())
-	val_dirs_list = []
-	test_dirs_list = []
-	val_creation = True
-	while val_creation:
+    train_dirs_list = list(segment_others.values())
+    val_dirs_list = []
+    test_dirs_list = []
+    val_creation = True
+    while val_creation:
 	    seq_choice = random.choice(train_dirs_list)
 	    while val_size[seq_choice[-18]] == 0:
 	        seq_choice = random.choice(train_dirs_list)
@@ -82,7 +86,7 @@ def main():
 	    if not loop_check:
 	        val_creation = False
 	            
-	if test_proportion > 0:
+    if test_proportion > 0:
 	    test_creation = True
 	    while test_creation:
 	        seq_choice = random.choice(train_dirs_list)
@@ -99,9 +103,9 @@ def main():
 	            test_creation = False
 
 
-	train_dirs_list = train_dirs_list + list(segment_10.values())
+    train_dirs_list = train_dirs_list + list(segment_10.values())
 
-	for path in train_dirs_list:
+    for path in train_dirs_list:
     	get_segment_viewed(PSG_recordings, path, MASS_MODA_proccessed_path + '/TRAIN')
 
 
@@ -175,8 +179,15 @@ def get_segment_viewed(mass_recordings_dict, moda_annotation_path, processed_pat
 
     recording_path = mass_recordings_dict[file_name]
     recording = mne.io.read_raw_edf(recording_path)
+
+    channels = recording.info['ch_names']
+    index = 0
+    for i, ch in enumerate(channels):
+        if 'C3' in ch:
+            index = i
+
     raw_data = recording.get_data()
-    c3_channel = raw_data[6,:]
+    c3_channel = raw_data[index,:]
 
     counter = 0
     for start, duration in zip(relevant_segments.startSec, relevant_segments.durationSec):
@@ -222,3 +233,6 @@ def get_segment_viewed(mass_recordings_dict, moda_annotation_path, processed_pat
             counter += 1
 
             plt.close('all')
+
+
+main()
