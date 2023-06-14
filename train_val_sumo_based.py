@@ -1,8 +1,9 @@
 from scipy import signal
-from scipy.fft import fftshift
 import numpy as np
 
-from scipy.signal import butter, sosfilt, sosfreqz, resample, sosfiltfilt
+from scipy.signal import butter, resample_poly, sosfiltfilt
+from scipy.signal.windows import hann
+from scipy.fft import rfft, rfftfreq
 rng = np.random.default_rng()
 
 from mne.time_frequency import tfr_array_multitaper
@@ -18,15 +19,15 @@ import mne
 import pandas as pd
 
 OVERLAP = 0
-WINDOW_SIZE = 30
+WINDOW_SIZE = 115
 MASS_sampling_freq = 256
-val_proportion = 0.2
+val_proportion = 0
 test_proportion = 0
 
 def main():
     MASS_path = '/dtu-compute/macaroni/data/mass'
     MODA_path = '/home/s174411/code/MODA_GC/output/exp/annotFiles'
-    MASS_MODA_proccessed_path = '/scratch/s174411/sumo_split_fix_30'
+    MASS_MODA_proccessed_path = '/scratch/s174411/all_segments'
 
     if not exists(MASS_MODA_proccessed_path):
                 mkdir(MASS_MODA_proccessed_path)
@@ -72,7 +73,7 @@ def main():
     val_dirs_list = []
     test_dirs_list = []
     val_creation = True
-    while val_creation:
+    while val_creation and val_proportion > 0:
 	    seq_choice = random.choice(train_dirs_list)
 	    while val_size[seq_choice[-18]] == 0:
 	        seq_choice = random.choice(train_dirs_list)
@@ -116,9 +117,79 @@ def main():
     for path in test_dirs_list:
     	get_segment_viewed(PSG_recordings, path, MASS_MODA_proccessed_path + '/TEST')
 
+def butter_bandpass_filter(data, lowcut, highcut, sample_rate, order):
+    """
+    Bandpass filter the data using Butterworth IIR filters.
+
+    Two digital Butterworth IIR filters with the specified order are created, one highpass filter for the lower critical
+    frequency and one lowpass filter for the higher critical frequency. Both filters use second-order sections (SOS).
+    Then first the highpass filter is applied on the given data and on its result the lowpass filter is applied.
+    Both filters are applied as forward-backward digital filters to correct the non-linear phase.
+
+    Parameters
+    ----------
+    data : ndarray
+        The data to be filtered; format (n_samples,)
+    lowcut : float
+        The lower critical frequency
+    highcut : float
+        The higher critical frequency
+    sample_rate : float
+        The sampling rate of the given data
+    order : int
+        The order of the used filters
+
+    Returns
+    -------
+    data : ndarray
+        the bandpass filtered data; format (n_samples,)
+    """
+
+    sos_high = butter(order, lowcut, btype='hp', fs=sample_rate, output='sos')
+    sos_low = butter(order, highcut, btype='lp', fs=sample_rate, output='sos')
+    return sosfiltfilt(sos_low, sosfiltfilt(sos_high, data, padlen=3 * order), padlen=3 * order)
+
+
+def downsample(data, sample_rate, resampling_frequency):
+    """
+    Downsample the given data to a target frequency.
+
+    Uses the scipy resample_poly function to transform the data from the original sample_rate to resampling_frequency.
+
+    Parameters
+    ----------
+    data : ndarray
+        The data to be downsampled; format (n_samples,)
+    sample_rate : int or float
+        The original sample rate of data
+    resampling_frequency : int or float
+        The target sample rate to transform data into, must not be higher than sample_rate
+
+    Returns
+    -------
+    data : ndarray
+        The downsampled data; format (n_samples_new,)
+    """
+
+    if (sample_rate != int(sample_rate)) | (resampling_frequency != int(resampling_frequency)):
+        raise Exception('parameters "sample_rate" and "resampling_frequency" have to be integers')
+    elif sample_rate < resampling_frequency:
+        raise Exception('the original sample frequency must not be lower than the resample frequency')
+    elif sample_rate == resampling_frequency:
+        return data
+
+    sample_rate = int(sample_rate)
+    resampling_frequency = int(resampling_frequency)
+
+    gcd = np.gcd(sample_rate, resampling_frequency)
+
+    up = resampling_frequency // gcd
+    down = sample_rate // gcd
+
+    return resample_poly(data, up, down)
 
 def overlapping_windows(sequence, labels, master_start, master_stop, sampling_frequency, window_duration, overlap):
-    window_len = sampling_frequency * window_duration
+    window_len = int(sampling_frequency * window_duration)
     step_size = (1-overlap) * window_len
 
     # Additinal seq length is given, cause it's hard to divide a seq into equal lengths. 
@@ -156,6 +227,11 @@ def overlapping_windows(sequence, labels, master_start, master_stop, sampling_fr
                     x1 = (labels[j][0] - (master_start + (window_start/sampling_frequency)))/window_duration
                     x2 = 1
                     width = x2 - x1
+
+                    if (width * window_duration) < 0.3:
+                        print("Condition met")
+                        continue
+
                     center = x1 + width/2
                     current_window.append((center, width))
                     continue
@@ -180,25 +256,46 @@ def get_segment_viewed(mass_recordings_dict, moda_annotation_path, processed_pat
     recording_path = mass_recordings_dict[file_name]
     recording = mne.io.read_raw_edf(recording_path)
 
+    sfreq = recording.info['sfreq']
+    
     channels = recording.info['ch_names']
-    index = 0
+    c3_name = ''
     for i, ch in enumerate(channels):
-        if 'C3' in ch:
-            index = i
+        if 'C3' in ch or 'c3' in ch:
+            c3_name = ch
+    a2_name = ''
+    for i, ch in enumerate(channels):
+        if 'A2' in ch or 'a2' in ch:
+            a2_name = ch
 
-    raw_data = recording.get_data()
-    c3_channel = raw_data[index,:]
+    c3 = recording.copy()
+    c3 = c3.pick(c3_name).get_data()
+    if a2_name != '':
+        a2 = recording.copy()
+        a2 = a2.pick(a2_name).get_data()
+
+        full_eeg = c3 - a2
+
+        print(full_eeg[:10])
+        print(a2_name)
+        print(c3_name)
+    else:
+        full_eeg = c3
+
+    full_eeg = full_eeg.flatten()
+    print(sfreq)
+    
 
     counter = 0
     for start, duration in zip(relevant_segments.startSec, relevant_segments.durationSec):
         ADDITIONAL_END = WINDOW_SIZE
-        sequence = c3_channel[int(start*MASS_sampling_freq) : int((start + duration + ADDITIONAL_END)*MASS_sampling_freq)]
+        sequence = full_eeg[int(start*sfreq) : int((start + duration + ADDITIONAL_END)*sfreq)]
 
 
         labels = data[data.eventName == 'spindle']
         labels.drop(labels.columns[-1],axis=1, inplace = True)
 
-        sequence_windowed, labels_windowed = overlapping_windows(sequence, labels.to_numpy(), start, start + duration, MASS_sampling_freq, WINDOW_SIZE, OVERLAP)
+        sequence_windowed, labels_windowed = overlapping_windows(sequence, labels.to_numpy(), start, start + duration, sfreq, WINDOW_SIZE, OVERLAP)
 
         for j,window in enumerate(sequence_windowed):
            
@@ -223,7 +320,7 @@ def get_segment_viewed(mass_recordings_dict, moda_annotation_path, processed_pat
 
             window_np = np.asarray(window)
             #filtered_array = butter_bandpass_filter(window_np, 0.3, 30, 256, 10)
-            filtered_array = window_np
+            filtered_array = downsample(butter_bandpass_filter(window_np, 0.3, 30.0, sfreq, 10), sfreq, 100)
             np.save(processed_path + '/input/' + file_name + "/" + str(counter) + '.npy', filtered_array)
             #np.save(Dreams_path + '/windowed' + '/labels/' + str(i) + "/" + str(j) + '.npy', label_windows)
 
